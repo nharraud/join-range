@@ -18,68 +18,54 @@
         class joiner
         {
         public:
-            typedef typename R::iterator::value_type value_type;
+            typedef typename boost::range_value<R>::type value_type;
+            typedef typename boost::range_iterator<R>::type iterator_type;
             void operator()(R& r) { _result = boost::join(_result, r); }
             boost::any_range<value_type,
-            //boost::bidirectional_traversal_tag,
-            typename boost::iterator_traversal<typename R::iterator>::type,
+            typename boost::iterator_traversal<iterator_type>::type,
             value_type, std::ptrdiff_t>
             result()
             { return _result; }
         private:
             boost::any_range<value_type,
-            //boost::bidirectional_traversal_tag,
-            typename boost::iterator_traversal<typename R::iterator>::type,
+            typename boost::iterator_traversal<iterator_type>::type,
             value_type, std::ptrdiff_t> _result;
         };
 
         template< class R>
         struct dyn_joined_range :
             public boost::any_range<
-              typename R::iterator::value_type::iterator::value_type
-            //, boost::bidirectional_traversal_tag
-            , typename boost::iterator_traversal<typename R::iterator::value_type::iterator>::type
-            //, typename boost::detail::iterator_traits<typename R::iterator>::iterator_category
-            , typename R::iterator::value_type::iterator::value_type
+                          typename boost::range_value<typename boost::range_value<R>::type>::type
+            , typename boost::iterator_traversal<
+                //typename R::iterator::value_type::iterator
+              typename boost::range_iterator<typename boost::range_value<R>::type>::type
+              >::type
+            , typename boost::range_value<typename boost::range_value<R>::type>::type
             , std::ptrdiff_t>
-            //          boost::range_iterator<
-            //            BOOST_DEDUCED_TYPENAME range_iterator<V>::type
-            //                                  >
-            //                             >
         {
         private:
-            typedef typename R::iterator::value_type::iterator::value_type value_type;
-            typedef boost::any_range<value_type
-            , typename boost::iterator_traversal<typename R::iterator::value_type::iterator>::type,
-                    //,boost::bidirectional_traversal_tag,
-                    value_type,
+            typedef typename boost::range_value<R>::type first_level_value_type;
+            typedef typename boost::range_iterator<R>::type first_level_iterator_type;
+            typedef typename boost::range_value<typename boost::range_value<R>::type>::type second_level_value_type;
+            typedef typename boost::range_iterator<typename boost::range_value<R>::type>::type second_level_iterator_type;
+            typedef boost::any_range<second_level_value_type
+            , typename boost::iterator_traversal<second_level_iterator_type>::type,
+                    second_level_value_type,
                     std::ptrdiff_t>
             base;
-            // typedef boost::iterator_range<
-            //           boost::range_iterator<
-            //             BOOST_DEDUCED_TYPENAME range_iterator<V>::type
-            //                                   >
-            //                              >
-            //     base;
 
         public:
-            //typedef boost::range_iterator<BOOST_DEDUCED_TYPENAME range_iterator<V>::type> iterator;
 
             explicit dyn_joined_range( R& r )
-                //: base( iterator(boost::end(r)), iterator(boost::begin(r)) )
-                //: base( std::for_each(boost::begin(r), boost::end(r), joiner<V>()).result())
                 :base(
                     std::for_each(boost::begin(r), boost::end(r),
-                        joiner<typename R::iterator::value_type>()).result() )
+                        joiner<first_level_value_type>()).result() )
             {
-            // std::for_each(r.begin(), r.end(),
-            //         joiner<typename std::iterator_traits<typename R::iterator>::value_type, V>());
             }
-            // template<class Iterator>
-            dyn_joined_range(typename R::iterator& first, typename R::iterator& last)
+            dyn_joined_range(first_level_iterator_type& first, first_level_iterator_type& last)
                 : base(
                     std::for_each(first, last,
-                        joiner<typename R::iterator::value_type>()).result() )
+                        joiner<first_level_value_type>()).result() )
             {
             }
         };
@@ -167,7 +153,13 @@ int main() {
     for (int v :
             // jr)
             // vv | boost::adaptors::reversed | adaptors::dyn_joined)
-             vv | boost::adaptors::reversed | adaptors::dyn_joined | boost::adaptors::uniqued )
+             vv
+             | boost::adaptors::transformed([](std::vector<int>& a) -> std::vector<int>& { a[0] = 51; return a; })
+             //|  boost::adaptors::reversed
+             //| boost::adaptors::filtered([](std::vector<int>& v) {return v[0] != 1;})
+             | adaptors::dyn_joined
+             //| boost::adaptors::uniqued
+             )
             //  vv | adaptors::dyn_joined | boost::adaptors::copied(1,5))
             //  vv | boost::adaptors::uniqued | boost::adaptors::copied(1,5))
             // std::for_each(boost::begin(vv), boost::end(vv),
